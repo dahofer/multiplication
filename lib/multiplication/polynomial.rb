@@ -84,42 +84,60 @@ module Multiplication
       inverse_fast_fourier_transform(product_points)
     end
 
-    def calculate_root_of_unity(size)
-      # e ^ ((2 * i * pi) / n)
-      Math::E ** ((2 * Math::PI * Complex(0, 1)) / size)
+    def calculate_root_of_unity(size, inverse = false)
+      if inverse
+        # e ^ -((2 * i * pi) / n)
+        Math::E ** -((2 * Math::PI * Complex(0, 1)) / size)
+      else
+        # e ^ ((2 * i * pi) / n)
+        Math::E ** ((2 * Math::PI * Complex(0, 1)) / size)
+      end
     end
 
-    def fast_fourier_transform(coefficients)
+    def fast_fourier_transform(coefficients, inverse = false, double = false)
       # NOTE(hofer): Pad out coefficient length to a power of 2.
       padded_length = 2 ** (Math.log2(coefficients.length).ceil)
       while coefficients.length < padded_length
         coefficients.push(0)
       end
 
-      return recursive_fast_fourier_transform(coefficients)
+      return recursive_fast_fourier_transform(coefficients, inverse, double)
     end
 
-    def recursive_fast_fourier_transform(coefficients)
-      # NOTE(hofer): Evaluation at the fourth root of unity and its
+    # NOTE(hofer): This expects coefficients.length to be a power of 2.
+    def recursive_fast_fourier_transform(coefficients, inverse = false, double = false)
+      # NOTE(hofer): Evaluation at the second or fourth root of unity and its
       # powers up to unity (ie i, -1, -i, 1).
       if coefficients.length == 2
-        return [
-          coefficients.first + coefficients.last,
-          coefficients.first - coefficients.last,
-          coefficients.first + Complex(0, 1) * coefficients.last,
-          coefficients.first - Complex(0, 1) * coefficients.last,
-        ]
+        if double
+          return [
+            coefficients.first + coefficients.last,
+            coefficients.first + Complex(0, 1) * coefficients.last,
+            coefficients.first - coefficients.last,
+            coefficients.first - Complex(0, 1) * coefficients.last,
+          ]
+        else
+          return [
+            coefficients.first + coefficients.last,
+            coefficients.first - coefficients.last,
+          ]
+        end
       end
 
-      root_of_unity = calculate_root_of_unity(2 * coefficients.length)
+      omega = calculate_root_of_unity(coefficients.length * (double ? 2 : 1), inverse)
 
       coefficients_with_powers = coefficients.zip((0..coefficients.length - 1))
       even_coefficients_with_powers, odd_coefficients_with_powers =
                                      coefficients_with_powers.partition { |pair| pair.last % 2 == 0 }
-      even_points = recursive_fast_fourier_transform(even_coefficients_with_powers.map(&:first))
-      odd_points = recursive_fast_fourier_transform(odd_coefficients_with_powers.map(&:first))
+      even_points = recursive_fast_fourier_transform(even_coefficients_with_powers.map(&:first), inverse, double)
+      odd_points = recursive_fast_fourier_transform(odd_coefficients_with_powers.map(&:first), inverse, double)
 
-      multiplied_odd_points = odd_points.map { |point| root_of_unity * point }
+      multiplied_odd_points = []
+      omega_power = 1
+      odd_points.each do |odd_point|
+        multiplied_odd_points << omega_power * odd_point
+        omega_power *= omega
+      end
 
       plus_points = even_points.zip(multiplied_odd_points).map { |pair| pair.first + pair.last }
       minus_points = even_points.zip(multiplied_odd_points).map { |pair| pair.first - pair.last }
@@ -128,8 +146,21 @@ module Multiplication
     end
 
     def inverse_fast_fourier_transform(points)
+      unscaled_coefficients = fast_fourier_transform(points, true)
+      n = unscaled_coefficients.length
+      scaled_coefficients = unscaled_coefficients.map { |coefficient| coefficient / n }
+      scaled_coefficients.each do |coefficient|
+        raise "Unexpectedly large imaginary component! #{coefficient}" if coefficient.imag.abs > 0.001
+        real_part = coefficient.real
+        if (real_part - real_part.round).abs > 0.01
+          raise "Real component is > 0.01 away from an integer! #{coefficient}"
+        end
+      end
+
+      scaled_coefficients.map { |coefficient| coefficient.real.round }
     end
 
+    # TODO(hofer): Speed this up using Horner's rule.
     def evaluate_at(point)
       coefficients_and_powers = @coefficients.zip((0..max_power).to_a)
       coefficients_and_powers.reduce(0) { |sum, pair| sum += (pair.first * point ** pair.last) }
