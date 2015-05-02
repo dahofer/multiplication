@@ -1,5 +1,5 @@
 module Multiplication
-  class Integer
+  class LargeInteger
     @value = 0
 
     attr_reader :value
@@ -42,7 +42,7 @@ module Multiplication
     # http://numbers.computation.free.fr/Constants/Algorithms/fft.html
     def fft_multiply(other_integer)
       approximate_base_number = @value.to_s.length + other_integer.value.to_s.length
-      digits_per_chunk = Math.ceil(Math.log10(approximate_base_number))
+      digits_per_chunk = (Math.log10(approximate_base_number)).ceil
       our_polynomial = create_polynomial(@value, digits_per_chunk)
       other_polynomial = create_polynomial(other_integer.value, digits_per_chunk)
       product_polynomial = our_polynomial * other_polynomial
