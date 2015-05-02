@@ -78,10 +78,20 @@ module Multiplication
     end
 
     def fast_fourier_multiply(our_polynomial, other_polynomial)
-      interpolated_points = fast_fourier_transform(our_polynomial.coefficients)
-      other_interpolated_points = fast_fourier_transform(other_polynomial.coefficients)
-      product_points = interpolated_points.zip(other_interpolated_points).map(&:*)
-      inverse_fast_fourier_transform(product_points)
+      max_length = [our_polynomial.coefficients.length, other_polynomial.coefficients.length].max
+      # NOTE(hofer): In case of differing lengths, pad out the
+      # polynomial with the lesser max power.
+      while our_polynomial.coefficients.length < max_length
+        our_polynomial.coefficients << 0
+      end
+      while other_polynomial.coefficients.length < max_length
+        other_polynomial.coefficients << 0
+      end
+
+      interpolated_points = fast_fourier_transform(our_polynomial.coefficients, false, true)
+      other_interpolated_points = fast_fourier_transform(other_polynomial.coefficients, false, true)
+      product_points = interpolated_points.zip(other_interpolated_points).map { |pair| pair.first * pair.last }
+      return self.class.new(inverse_fast_fourier_transform(product_points))
     end
 
     def calculate_root_of_unity(size, inverse = false)
@@ -95,6 +105,8 @@ module Multiplication
     end
 
     def fast_fourier_transform(coefficients, inverse = false, double = false)
+      return coefficients if coefficients.length <= 1
+
       # NOTE(hofer): Pad out coefficient length to a power of 2.
       padded_length = 2 ** (Math.log2(coefficients.length).ceil)
       while coefficients.length < padded_length
