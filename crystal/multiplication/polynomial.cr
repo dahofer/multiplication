@@ -1,10 +1,14 @@
 require "complex"
+require "big_int"
 
 module Multiplication
   class Polynomial
-    @coefficients = [0]
+    ZERO = Complex.new(0, 0)
+    @coefficients = [ZERO] of Complex
     @algorithm = :naive
+    @degree = 0
     getter :coefficients
+    getter :degree
 
     ALGORITHM_OPTIONS = [
       :naive,
@@ -12,7 +16,7 @@ module Multiplication
     ]
 
     def initialize(coefficients, algorithm = :naive)
-      while (coefficients[-1] == 0)
+      while (coefficients.last == ZERO)
         coefficients.pop
       end
 
@@ -20,7 +24,10 @@ module Multiplication
         raise "Coefficients array is empty!"
       end
 
+      @degree = coefficients.length
+
       @coefficients = coefficients
+
       @algorithm = algorithm
     end
 
@@ -36,7 +43,7 @@ module Multiplication
     end
 
     def naive_multiply(our_polynomial, other_polynomial)
-      product = Array.new(our_polynomial.max_power + other_polynomial.max_power + 1, 0)
+      product = Array.new(our_polynomial.max_power + other_polynomial.max_power + 1, ZERO)
       our_polynomial.coefficients.each_with_index do |coefficient, i|
         other_polynomial.coefficients.each_with_index do |other_coefficient, j|
           if !(coefficient.nil? || other_coefficient.nil?)
@@ -91,26 +98,30 @@ module Multiplication
       # NOTE(hofer): In case of differing lengths, pad out the
       # polynomial with the lesser max power.
       while our_polynomial.coefficients.length < max_length
-        our_polynomial.coefficients << 0
+        our_polynomial.coefficients << ZERO
       end
       while other_polynomial.coefficients.length < max_length
-        other_polynomial.coefficients << 0
+        other_polynomial.coefficients << ZERO
       end
 
       interpolated_points = fast_fourier_transform(our_polynomial.coefficients, false, true)
       other_interpolated_points = fast_fourier_transform(other_polynomial.coefficients, false, true)
-      product_points = interpolated_points.zip(other_interpolated_points).map { |pair| pair.first * pair.last }
+      product_points = [] of Complex
+      interpolated_points.each_with_index do |point, i|
+        product_points << point * other_interpolated_points[i]
+      end
       return self.class.new(inverse_fast_fourier_transform(product_points))
     end
 
     def calculate_root_of_unity(size, inverse = false)
+      radians = (2 * Math::PI) / size
       if inverse
         # e ^ -((2 * i * pi) / n)
-        # Math::E ** -((2 * Math::PI * Complex(0, 1)) / size)
-        Complex.new(-Math.cos(radians), -Math.sin(radians))
+        radians *= -1
+        Complex.new(Math.cos(radians), Math.sin(radians))
       else
         # e ^ ((2 * i * pi) / n)
-        Math::E ** ((2 * Math::PI * Complex.new(0, 1)) / size)
+        Complex.new(Math.cos(radians), Math.sin(radians))
       end
     end
 
@@ -120,7 +131,7 @@ module Multiplication
       # NOTE(hofer): Pad out coefficient length to a power of 2.
       padded_length = 2 ** (Math.log2(coefficients.length).ceil)
       while coefficients.length < padded_length
-        coefficients.push(0)
+        coefficients.push(ZERO)
       end
 
       return recursive_fast_fourier_transform(coefficients, inverse, double)
@@ -134,28 +145,28 @@ module Multiplication
         if double
           return [
             coefficients.first + coefficients.last,
-            coefficients.first + Complex.new(0, 1) * coefficients.last,
+            coefficients.first + coefficients.last * Complex.new(0, 1),
             coefficients.first - coefficients.last,
-            coefficients.first - Complex.new(0, 1) * coefficients.last,
-          ]
+            coefficients.first - coefficients.last * Complex.new(0, 1),
+          ] of Complex
         else
           return [
             coefficients.first + coefficients.last,
             coefficients.first - coefficients.last,
-          ]
+          ] of Complex
         end
       end
 
       omega = calculate_root_of_unity(coefficients.length * (double ? 2 : 1), inverse)
 
-      coefficients_with_powers = coefficients.zip((0..coefficients.length - 1))
+      coefficients_with_powers = coefficients.zip((0..coefficients.length - 1).to_a)
       even_coefficients_with_powers, odd_coefficients_with_powers =
                                      coefficients_with_powers.partition { |pair| pair.last % 2 == 0 }
-      even_points = recursive_fast_fourier_transform(even_coefficients_with_powers.map(&:first), inverse, double)
-      odd_points = recursive_fast_fourier_transform(odd_coefficients_with_powers.map(&:first), inverse, double)
+      even_points = recursive_fast_fourier_transform(even_coefficients_with_powers.map { |x| x.first }, inverse, double)
+      odd_points = recursive_fast_fourier_transform(odd_coefficients_with_powers.map { |x| x.first }, inverse, double)
 
       multiplied_odd_points = [] of Complex
-      omega_power = 1
+      omega_power = Complex.new(1, 0)
       odd_points.each do |odd_point|
         multiplied_odd_points << omega_power * odd_point
         omega_power *= omega
@@ -164,7 +175,7 @@ module Multiplication
       plus_points = even_points.zip(multiplied_odd_points).map { |pair| pair.first + pair.last }
       minus_points = even_points.zip(multiplied_odd_points).map { |pair| pair.first - pair.last }
 
-      return plus_points.concat minus_points
+      return plus_points.concat(minus_points)
     end
 
     def inverse_fast_fourier_transform(points)
@@ -179,13 +190,29 @@ module Multiplication
         end
       end
 
-      scaled_coefficients.map { |coefficient| coefficient.real.round }
+      scaled_coefficients
     end
 
     # TODO(hofer): Speed this up using Horner's rule.
     def evaluate_at(point)
-      coefficients_and_powers = @coefficients.zip((0..max_power).to_a)
-      coefficients_and_powers.reduce(0) { |sum, pair| sum += (pair.first * point ** pair.last) }
+      result = BigInt.new(0)
+
+      (0..@degree-1).to_a.reverse.each do |i|
+        coefficient = @coefficients[i]
+        puts coefficient
+        next if coefficient.real.abs < 0.001
+        int_coefficient = BigInt.new(coefficient.real.round.to_s.split(".").first)
+        int_power = BigInt.new(1)
+        i.times do
+          int_power *= point
+        end
+        power = int_coefficient * int_power
+        puts power
+        result += power
+        puts result
+      end
+
+      return result
     end
   end
 end

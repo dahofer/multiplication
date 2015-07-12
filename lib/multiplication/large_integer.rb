@@ -13,8 +13,8 @@ module Multiplication
     end
 
     def create_polynomial(some_value, digits_per_chunk)
-      digits = some_value.to_s.split.reverse
-      new_base_digits = digits.each_slice(digits_per_chunk).map(&:join).map(&:to_i)
+      digits = some_value.to_s.split("").reverse
+      new_base_digits = digits.each_slice(digits_per_chunk).map(&:reverse).map(&:join).map(&:to_i)
       Polynomial.new(new_base_digits, :fast_fourier)
     end
 
