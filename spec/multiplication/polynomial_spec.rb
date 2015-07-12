@@ -115,5 +115,36 @@ module Multiplication
         expect(p.inverse_fast_fourier_transform(p.fast_fourier_transform(test_coefficients))).to eq test_coefficients
       end
     end
+
+    context "timing" do
+      def random_coefficients(length = 1000)
+        (1..length).to_a.map { (0..1000).to_a.sample }
+      end
+
+      def test_fft_multiply(polynomial1, polynomial2, expected_product)
+        expect((polynomial1 * polynomial2).coefficients).to eq expected_product.coefficients
+      end
+
+      it "runs a timing test" do
+        c1 = random_coefficients(10_000)
+        c2 = random_coefficients(10_000)
+
+        naive_polynomial1 = Multiplication::Polynomial.new(c1, :naive)
+        naive_polynomial2 = Multiplication::Polynomial.new(c2, :naive)
+        start1 = Time.now
+        result = naive_polynomial1 * naive_polynomial2
+        end1 = Time.now
+
+        puts "Time for naive polynomial multiplication: #{end1 - start1}"
+
+        fft_polynomial1 = Multiplication::Polynomial.new(c1, :fast_fourier)
+        fft_polynomial2 = Multiplication::Polynomial.new(c2, :fast_fourier)
+        start2 = Time.now
+        test_fft_multiply(fft_polynomial1, fft_polynomial2, result)
+        end2 = Time.now
+
+        puts "Time for FFT polynomial multiplication: #{end2 - start2}"
+      end
+    end
   end
 end
