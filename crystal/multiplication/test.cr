@@ -18,10 +18,8 @@ module Multiplication
     end
 
     def self.run_test
-#      x1 = random_integer(1_000_000)
-#      x2 = random_integer(1_000_000)
-      x1 = random_integer(70)
-      x2 = random_integer(70)
+      x1 = random_integer(10_000)
+      x2 = random_integer(10_000)
       start1 = Time.now
       result = x1 * x2
       end1 = Time.now

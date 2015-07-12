@@ -199,17 +199,14 @@ module Multiplication
 
       (0..@degree-1).to_a.reverse.each do |i|
         coefficient = @coefficients[i]
-        puts coefficient
         next if coefficient.real.abs < 0.001
-        int_coefficient = BigInt.new(coefficient.real.round.to_s.split(".").first)
+        int_coefficient = BigInt.new(coefficient.real.round.to_i64)
         int_power = BigInt.new(1)
         i.times do
           int_power *= point
         end
         power = int_coefficient * int_power
-        puts power
         result += power
-        puts result
       end
 
       return result
