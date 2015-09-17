@@ -6,7 +6,6 @@ def faster_matrix_multiply(a, b)
   matrix = Matrix(typeof(a[0] * b[0])).new(a.rows.count, b.columns.count)
   pos = -1
   b_columns = b.columns
-  initial_sum = typeof(a[0] * b[0]).cast(0.0)
   a.rows.each do |a_row|
     b_columns.each do |b_column|
       matrix[pos += 1] = typeof(a[0] * b[0]).cast((0...a_row.length).inject(0) do |memo, i|
