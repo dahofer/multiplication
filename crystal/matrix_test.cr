@@ -18,13 +18,13 @@ end
 
 def main()
   r = Random.new
-  a = Matrix.new(1000, 1000, 0)
-  b = Matrix.new(1000, 1000, 0)
+  a = Matrix.new(1000, 1000, 0.0)
+  b = Matrix.new(1000, 1000, 0.0)
 
   (0..999).each do |i|
     (0..999).each do |j|
-      a[i,j] = r.next_int
-      b[i,j] = r.next_int
+      a[i,j] = r.next_float
+      b[i,j] = r.next_float
     end
   end
 
