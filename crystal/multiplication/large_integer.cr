@@ -1,8 +1,11 @@
+require "./polynomial"
+require "big_int"
+
 module Multiplication
   class LargeInteger
-    @value = 0
+    @value = BigInt.new(0)
 
-    attr_reader :value
+    getter :value
 
     def initialize(value)
       @value = value
@@ -14,8 +17,9 @@ module Multiplication
 
     def create_polynomial(some_value, digits_per_chunk)
       digits = some_value.to_s.split("").reverse
-      new_base_digits = digits.each_slice(digits_per_chunk).map(&:reverse).map(&:join).map(&:to_i)
-      Polynomial.new(new_base_digits, :fast_fourier)
+      digit_chunks = digits.each_slice(digits_per_chunk).to_a.map { |x| Int64.cast(x.reverse.join("")) }
+      new_digits = digit_chunks.map { |x| Complex.new(x.to_i, 0) }
+      Polynomial.new(new_digits, :fast_fourier)
     end
 
     # NOTE(hofer): Fast Fourier based multiplication involves
@@ -42,12 +46,17 @@ module Multiplication
     # http://numbers.computation.free.fr/Constants/Algorithms/fft.html
     def fft_multiply(other_integer)
       approximate_base_number = @value.to_s.length + other_integer.value.to_s.length
-      digits_per_chunk = (Math.log10(approximate_base_number)).ceil
+      digits_per_chunk = (Math.log10(approximate_base_number)).ceil.to_i
       our_polynomial = create_polynomial(@value, digits_per_chunk)
       other_polynomial = create_polynomial(other_integer.value, digits_per_chunk)
       product_polynomial = our_polynomial * other_polynomial
 
-      return product_polynomial.evaluate_at(10 ** digits_per_chunk)
+      base = BigInt.new(1)
+      digits_per_chunk.times do
+        base *= 10
+      end
+
+      return product_polynomial.evaluate_at(base)
     end
 
     def split_integer(int_value)
